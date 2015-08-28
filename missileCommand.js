@@ -10,6 +10,7 @@ var missileCommand = (function() {
       var CANVAS_HEIGHT = $canvasElement[0].height;
     //Object arrays
       var cities = [];
+      var batteries = [];
 
   //Object rendering coordinate sets
     //Background
@@ -17,7 +18,7 @@ var missileCommand = (function() {
         [[0,0], [0,1], [1,1], [1,0]];
 
       var surfaceRenderingCoords = 
-        [[0, 1] /*BL corner*/, [0, 0.904] /*TL corner*/, [0.007, 0.897], [0.011, 0.897], [0.024, 0.874], 
+        [[0, 0.904] /*TL corner*/, [0.007, 0.897], [0.011, 0.897], [0.024, 0.874], 
         [0.047, 0.845], [0.055, 0.845], [0.060, 0.859], [0.107, 0.859], [0.112, 0.847], [0.121, 0.847], 
         [0.164, 0.916] /*end first mountain*/, [0.202, 0.915], [0.205, 0.903], [0.214, 0.903], 
         [0.221, 0.888], [0.227, 0.888], [0.243, 0.912], [0.275, 0.912], [0.303, 0.901], [0.358, 0.901], 
@@ -30,14 +31,14 @@ var missileCommand = (function() {
         [0.795, 0.919], [0.834, 0.919], [0.846, 0.907], [0.866, 0.907] /*end second valley*/, [0.873, 0.894], 
         [0.877, 0.898], [0.899, 0.867], [0.899, 0.860], [0.904, 0.847], [0.908, 0.847], [0.908, 0.844], 
         [0.918, 0.844], [0.918, 0.855], [0.971, 0.855], [0.976, 0.846], [0.983, 0.846], [0.997, 0.868], 
-        [0.997, 0.868], [1, 0.877] /* end third mountain*/, [1, 1] /*BR corner*/]
+        [0.997, 0.868], [1, 0.877] /* end third mountain*/, [1, 1] /*BR corner*/, [0, 1] /*BL corner*/]
 
     //Cities
       //Placement coordinates
         var cityLocationCoords = 
           [[0.141, 0.918], [0.241, 0.918], [0.338, 0.919], [0.545, 0.910], [0.672, 0.894], [0.777, 0.918]];
 
-      //Rendering Coordinates
+      //Rendering coordinates
         //Dark blue
           var cityRenderingCoordsDKBlue = 
             [[0, 0], [0.006, -0.006], [0.009, -0.036], [0.017, -0.022], [0.024, -0.024], [0.029, -0.012], 
@@ -50,11 +51,26 @@ var missileCommand = (function() {
             [0.041, 0.001], [0.04, -0.009], [0.037, -0.006], [0.034, -0.016], [0.031, -0.007], [0.025, -0.009], 
             [0.022, 0.003]];
 
+    //Defense Missile Batteries
+      //Defense missile battery placement coordinates
+        var defenseMissileBatteryLocationCoords = 
+          [[0.080, 0.859], [0.485, 0.855], [0.944, 0.855]];
+
+      //Defense missile placement coordinates **relative to batteries**
+        var defenseMissileLocationCoords = 
+          [[0.000, 0.000], [-0.012, 0.018], [0.013, 0.018], [-0.025, 0.036], [0.000, 0.036], [0.025, 0.036], 
+          [-0.037, 0.054], [-0.012, 0.054], [0.013, 0.054], [0.038, 0.054]];
+      
+      //Defense missile rendering coordinates
+        var loadedDefenseMissileRenderingCoords = 
+          [[0.000, 0.000], [0.005, 0.000], [0.005, 0.017], [0.010, 0.027], [0.005, 0.027], [0.0025, 0.0195], 
+          [0.000, 0.027], [-0.005, 0.027], [0.000, 0.017]];
+
     //Temporary utility function for converting single origin coords to convertible coords
       // var tempCoordConversion = function(coordSet){
       //   var holder = []
       //   for (coord in coordSet) {
-      //     holder.push([coordSet[coord][0]/1000, coordSet[coord][1]/668]);
+      //     holder.push([parseFloat(coordSet[coord][0]/1000).toFixed(3), parseFloat(coordSet[coord][1]/668).toFixed(3)]);
       //   }
       //   console.log('coords' + holder);
       // }
@@ -63,14 +79,16 @@ var missileCommand = (function() {
     //Initialize
       var initialize = function() {
         setup();
-        // tempCoordConversion(cityRenderingCoordsLTBlue);
+        // tempCoordConversion(loadedDefenseMissileRenderingCoordinates);
       }
       //Controller for starting the game
         var setup = function() {
           canvasSetup();
           objectCreator(City, cities, cityLocationCoords);
+          objectCreator(DefenseMissileBattery, batteries, defenseMissileBatteryLocationCoords);
           drawBackground();
           drawCities();
+          drawMissiles();
           setupListeners();
         }
 
@@ -91,18 +109,18 @@ var missileCommand = (function() {
               drawFromCoords('#ff0', surfaceRenderingCoords, 0, 0);
           };
 
-        //Create Objects
-          var objectCreator = function(objectType, objectHolder, objectLocations){
-            //Cycle through locating coordinate set, and push new object to object array
-            for (var coords in objectLocations) {
-              objectHolder.push( new objectType( CANVAS_WIDTH * objectLocations[coords][0], CANVAS_HEIGHT * objectLocations[coords][1] ) );
-            }
-          };
-
-        //Draw cities
+        //Draw objects - these should probably be moved into the objects and called during setInterval
           var drawCities = function(){
             for (var city in cities) {
-              cities[city].standing ? cities[city].render() : false;
+              cities[city].extant ? cities[city].render() : false;
+            }
+          }
+
+          var drawMissiles = function(){
+            for (var battery in batteries) {
+              for (var missile in batteries[battery].missiles) {
+                batteries[battery].missiles[missile].extant ? batteries[battery].missiles[missile].render() : false;
+              }
             }
           }
 
@@ -118,7 +136,7 @@ var missileCommand = (function() {
       function City(x, y) {
         this.x = x;
         this.y = y;
-        this.standing = true;
+        this.extant = true;
         this.render = function(){
           //Dark blue
           drawFromCoords('#00F', cityRenderingCoordsDKBlue, this.x, this.y);
@@ -127,17 +145,56 @@ var missileCommand = (function() {
         };
       }
 
+    //Defense missile battery object
+      function DefenseMissileBattery(x, y) {
+        this.x = x;
+        this.y = y;
+        this.extant = true;
+        this.missiles = [];
+        //go through missile location array and add missiles
+        this.loadMissiles = function(){
+          objectCreator(DefenseMissile, this.missiles, defenseMissileLocationCoords, this);
+        };
+        this.loadMissiles();
+      };
+
+    //Defense missile object
+      function DefenseMissile(x, y) {
+        this.x = x;
+        this.y = y;
+        this.extant = true;
+        this.originX;
+        this.originY;
+        this.targetX;
+        this.targetY;
+        this.render = function(){
+          drawFromCoords('#00F', loadedDefenseMissileRenderingCoords, this.x, this.y);
+        };
+      }
+
   //Utility Functions
     //Use coordinate sets to render objects in their respective locations
       var drawFromCoords = function(color, coordSet, originX, originY) {
         $canvas.fillStyle = color;
         $canvas.beginPath();
+        $canvas.moveTo(originX, originY);
         for (var coord in coordSet) {
           $canvas.lineTo( originX + CANVAS_WIDTH*coordSet[coord][0], originY + CANVAS_HEIGHT*coordSet[coord][1] ); 
         }
         $canvas.closePath();
         $canvas.fill();
       }
+
+    //Create Objects
+      var objectCreator = function(objectType, objectHolder, objectLocations, parentObject){
+        //create zero object if no parent passed
+        var parent = parentObject || {x: 0, y: 0};
+        //Cycle through locating coordinate set, and push new object to object array
+        for (var coords in objectLocations) {
+          objectHolder.push( new objectType( parent.x + ( CANVAS_WIDTH * objectLocations[coords][0] ), 
+                                             parent.y + ( CANVAS_HEIGHT * objectLocations[coords][1] ) ));
+        }
+      };
 
   //Public exposure declaration
     //Revealing Module design pattern
@@ -148,5 +205,6 @@ var missileCommand = (function() {
 })();
 
 $(document).ready(function(){
+  //Make it so, #1!
   missileCommand.initialize();
 });
