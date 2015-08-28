@@ -6,11 +6,12 @@ var missileCommand = (function() {
     //Canvas API selection
       var $canvas = $canvasElement[0].getContext("2d");
     //Canvas dimensions
-      var CANVAS_WIDTH = $canvasElement[0].width;
-      var CANVAS_HEIGHT = $canvasElement[0].height;
+      var canvas_width = $canvasElement[0].width;
+      var canvas_height = $canvasElement[0].height;
     //Object arrays
       var cities = [];
       var batteries = [];
+      var enemyMissilesPending = 30;
 
   //Object rendering coordinate sets
     //Background
@@ -78,16 +79,32 @@ var missileCommand = (function() {
   //Movement
     //Initialize
       var initialize = function() {
-        setup();
-        // gameplay flow controller
+        startupScreen();
+        startupListener();
         // tempCoordConversion(loadedDefenseMissileRenderingCoordinates);
       }
+
+        //Startup screen
+          var startupScreen = function(){
+            canvasCreator();
+            drawFromCoords('#000', backgroundRenderingCoords, 0, 0);
+            $canvas.fillStyle = 'blue';
+            $canvas.font = 'bold ' + canvas_height * 0.06 + 'px arial';
+            $canvas.fillText( 'MISSILE COMMAND: tOP', canvas_width * 0.26, canvas_height * 0.45 );
+            $canvas.fillStyle = 'blue';
+            $canvas.font = 'bold ' + canvas_height * 0.03 + 'px arial';
+            $canvas.fillText( 'CLICK TO FIRE MISSILES AND DEFEND CITIES', canvas_width * 0.275, canvas_height * 0.59 );
+          }
+
       //Controller for starting the game
-        var setup = function() {
+        var levelSetup = function() {
           canvasCreator();
+          drawBackground();
           objectCreator(City, cities, cityLocationCoords);
           objectCreator(DefenseMissileBattery, batteries, defenseMissileBatteryLocationCoords);
-          setupListeners();
+          gameListener();
+          // gameplay flow controller
+          // tempCoordConversion(loadedDefenseMissileRenderingCoordinates);
         }
 
         //Raw canvas setup
@@ -97,7 +114,6 @@ var missileCommand = (function() {
               'margin': '0 auto',
               'cursor': 'crosshair'
             });
-            drawBackground();
           }
 
           //Draw level background
@@ -109,14 +125,61 @@ var missileCommand = (function() {
             };
 
         //Control setup
-          var setupListeners = function() {
-            $canvasElement.on( 'click', function( event ) {
-              console.log('width: ' + ( (event.pageX - this.offsetLeft)) );
-              console.log('height: ' + ( (event.pageY - this.offsetTop)) );
+          var startupListener = function() {
+            $canvasElement.one( 'click', function( event ) {
+              levelSetup();
             });
           }
 
+          var gameListener = function() {
+            $canvasElement.on( 'click', function( event ) {
+              // console.log('width: ' + ( (event.pageX - this.offsetLeft)) );
+              // console.log('height: ' + ( (event.pageY - this.offsetTop)) );
+              selectBattery(event.pageX - this.offsetLeft, event.pageY - this.offsetTop);
+            });
+          }
+
+            var selectBattery = function(x, y) {
+              var sectionWidth = canvas_width/batteries.length;
+              //All batteries have missiles
+                if ( batteries.length === 3 ) {
+                  //Middle of three screen sections
+                  if ( x < sectionWidth * 2 && x > sectionWidth ) {
+                    batteries[1].fire(x, y);
+                  //Left section
+                  } else if ( x < sectionWidth ) {
+                    batteries[0].fire(x, y);
+                  //Right section
+                  } else {
+                    batteries[2].fire(x, y);
+                  }
+              //One battery is spent
+                } else if ( batteries.length === 2 ) {
+                  //Left section
+                  if (x < sectionWidth ) {
+                    batteries[0].fire(x, y);
+                  //Right section
+                  } else {
+                    batteries[1].fire(x, y);
+                  } 
+              //Two batteries spent
+                } else if ( batteries.length === 1 ) {
+                  batteries[0].fire(x, y);
+              //No batteries remain
+                } else { 
+                    //************************** either game over or... **************************
+                }
+              }
+
+
   //Object Declarations
+    //Game object prototype
+      // function GameObject(x, y) {
+      //   this.x = x;
+      //   this.y = y;
+      //   this.extant = true;
+      // }
+    //**************************Come back and set up object inheritance**************************
     //City Object
       function City(x, y) {
         this.x = x;
@@ -133,18 +196,37 @@ var missileCommand = (function() {
         }
         this.draw();
       }
+      // City.prototype = Object.create( GameObject.prototype );
+      // // City.prototype.constructor = City;
+      
 
     //Defense missile battery object
       function DefenseMissileBattery(x, y) {
         this.x = x;
         this.y = y;
-        this.extant = true;
+        // this.extant = true;
         this.missiles = [];
         //go through missile location array and add missiles
         this.loadMissiles = function(){
           objectCreator(DefenseMissile, this.missiles, defenseMissileLocationCoords, this);
         };
         this.loadMissiles();
+        //Check to make sure battery has missiles; if not, remove from battery array
+        this.loaded = function() {
+          this.missiles.length > 0 ? true : false;
+          // batteries.splice(batteries.indexOf(this), 1)
+        }
+        //Remove last missile from missile array
+        //**************************be sure to prevent removed missile from rendering**************************
+        //**************************start missile firing animation, etc.**************************
+        this.fire = function(x, y){
+          if (this.missiles.length > 1) {
+            this.missiles.splice(-1,1);
+          } else {
+            this.missiles.splice(-1,1);
+            batteries.splice(batteries.indexOf(this), 1)
+          }
+        }
       };
 
     //Defense missile object
@@ -172,7 +254,7 @@ var missileCommand = (function() {
         $canvas.beginPath();
         $canvas.moveTo(originX, originY);
         for (var coord in coordSet) {
-          $canvas.lineTo( originX + CANVAS_WIDTH*coordSet[coord][0], originY + CANVAS_HEIGHT*coordSet[coord][1] ); 
+          $canvas.lineTo( originX + canvas_width*coordSet[coord][0], originY + canvas_height*coordSet[coord][1] ); 
         }
         $canvas.closePath();
         $canvas.fill();
@@ -180,12 +262,13 @@ var missileCommand = (function() {
 
     //Create Objects
       var objectCreator = function(objectType, objectHolder, objectLocations, parentObject){
-        //create zero object if no parent passed
+        //Create 'zero' object if no parent passed
         var parent = parentObject || {x: 0, y: 0};
         //Cycle through locating coordinate set, and push new object to object array
         for (var coords in objectLocations) {
-          objectHolder.push( new objectType( parent.x + ( CANVAS_WIDTH * objectLocations[coords][0] ), 
-                                             parent.y + ( CANVAS_HEIGHT * objectLocations[coords][1] ) ));
+          objectHolder.push( new objectType(  parent.x + ( canvas_width * objectLocations[coords][0] ), 
+                                              parent.y + ( canvas_height * objectLocations[coords][1] ) 
+                                            ));
         }
       };
 
