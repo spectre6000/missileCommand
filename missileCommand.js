@@ -79,57 +79,42 @@ var missileCommand = (function() {
     //Initialize
       var initialize = function() {
         setup();
+        // gameplay flow controller
         // tempCoordConversion(loadedDefenseMissileRenderingCoordinates);
       }
       //Controller for starting the game
         var setup = function() {
-          canvasSetup();
+          canvasCreator();
           objectCreator(City, cities, cityLocationCoords);
           objectCreator(DefenseMissileBattery, batteries, defenseMissileBatteryLocationCoords);
-          drawBackground();
-          drawCities();
-          drawMissiles();
           setupListeners();
         }
 
         //Raw canvas setup
-          var canvasSetup = function(){
+          var canvasCreator = function(){
             $canvasElement.css({ 
               'display': 'block',
               'margin': '0 auto',
               'cursor': 'crosshair'
             });
+            drawBackground();
           }
 
-        //Draw level background
-          var drawBackground = function(){
-            //Black background
-              drawFromCoords('#000', backgroundRenderingCoords, 0, 0);
-            //Yellow surface
-              drawFromCoords('#ff0', surfaceRenderingCoords, 0, 0);
-          };
+          //Draw level background
+            var drawBackground = function(){
+              //Black background
+                drawFromCoords('#000', backgroundRenderingCoords, 0, 0);
+              //Yellow surface
+                drawFromCoords('#ff0', surfaceRenderingCoords, 0, 0);
+            };
 
-        //Draw objects - these should probably be moved into the objects and called during setInterval
-          var drawCities = function(){
-            for (var city in cities) {
-              cities[city].extant ? cities[city].render() : false;
-            }
+        //Control setup
+          var setupListeners = function() {
+            $canvasElement.on( 'click', function( event ) {
+              console.log('width: ' + ( (event.pageX - this.offsetLeft)) );
+              console.log('height: ' + ( (event.pageY - this.offsetTop)) );
+            });
           }
-
-          var drawMissiles = function(){
-            for (var battery in batteries) {
-              for (var missile in batteries[battery].missiles) {
-                batteries[battery].missiles[missile].extant ? batteries[battery].missiles[missile].render() : false;
-              }
-            }
-          }
-
-    var setupListeners = function() {
-      $canvasElement.on( 'click', function( event ) {
-        console.log('width: ' + ( (event.pageX - this.offsetLeft)) );
-        console.log('height: ' + ( (event.pageY - this.offsetTop)) );
-      });
-    }
 
   //Object Declarations
     //City Object
@@ -143,6 +128,10 @@ var missileCommand = (function() {
           //Light blue
           drawFromCoords('#ADD8E6', cityRenderingCoordsLTBlue, this.x, this.y);
         };
+        this.draw = function(){
+          this.extant ? this.render() : false;
+        }
+        this.draw();
       }
 
     //Defense missile battery object
@@ -170,6 +159,10 @@ var missileCommand = (function() {
         this.render = function(){
           drawFromCoords('#00F', loadedDefenseMissileRenderingCoords, this.x, this.y);
         };
+        this.draw = function(){
+          this.extant ? this.render() : false;
+        }
+        this.draw();
       }
 
   //Utility Functions
