@@ -14,9 +14,9 @@ var missileCommand = (function() {
       var attack;
     //Animation parameters
       //Pixels per axis per frame... 
-      var attackingMissileSpeed = 3; 
-      var defendingMissileSpeed = 2;
-      var enemyFireRate = 2000;
+      var attackingMissileSpeed = 1; 
+      var defendingMissileSpeed = 5;
+      var enemyFireRate = 3000;
       //Blast size
       var blastRadius = 25;
     //Object arrays
@@ -197,6 +197,18 @@ var missileCommand = (function() {
             }
           }
         }
+        this.missileHit = function() {
+          for (var i = 0; i < firedMissiles.length; i++) {
+           //any missiles that started at y=0 have currentx/y within the blast radius
+            if (  firedMissiles[i].originY === 0 && 
+                  Math.abs(this.targetX - firedMissiles[i].currentX) <= this.blastStatus && 
+                  Math.abs(this.targetY - firedMissiles[i].currentY) <= this.blastStatus) {
+              //remove those missiles from fired missile array
+              firedMissiles.splice(firedMissiles[i], 1);
+            }
+          }
+        }
+
         this.update = function() {
           //Enemyfire
             if (originY === 0 && this.currentY + attackingMissileSpeed <= this.targetY) {
@@ -210,22 +222,23 @@ var missileCommand = (function() {
               this.draw();
           //Blowed up
             } else if (this.blastStatus <= blastRadius) {
+            //Terminate the missile path at the target coordinates
               this.currentY = targetY;
               this.currentX = targetX;
               this.draw();
-              //blow up
-              //************************** make it blow up **************************
+            //blow up
               this.blastStatus += blastRadius/fps;
               $canvas.fillStyle = '#FFF';
               $canvas.beginPath();
               $canvas.arc(targetX, targetY, this.blastStatus, 0, 2*Math.PI);
               $canvas.stroke();
               $canvas.fill();
-          //Remove from firedMissiles array
+              if (this.originY !== 0 && this.blastStatus > 0) {
+                this.missileHit();
+              }
             } else {
               var target = this.cityHit();
               if (originY === 0 && target !== undefined) {
-                // console.log(this.cityHit());
                 cities.splice(this.cityHit(), 1); 
               }
               firedMissiles.splice(firedMissiles.indexOf(this), 1);
