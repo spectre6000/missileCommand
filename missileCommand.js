@@ -8,10 +8,22 @@ var missileCommand = (function() {
     //Canvas dimensions
       var canvas_width = $canvasElement[0].width;
       var canvas_height = $canvasElement[0].height;
+    //Framerate
+      var fps = 30;
+      var animation;
+      var attack;
+    //Animation parameters
+      //Pixels per axis per frame... 
+      var attackingMissileSpeed = 3; 
+      var defendingMissileSpeed = 2;
+      var enemyFireRate = 2000;
+      //Blast size
+      var blastRadius = 25;
     //Object arrays
       var cities = [];
       var batteries = [];
       var enemyMissilesPending = 30;
+      var firedMissiles = [];
 
   //Object rendering coordinate sets
     //Background
@@ -66,112 +78,7 @@ var missileCommand = (function() {
         var loadedDefenseMissileRenderingCoords = 
           [[0.000, 0.000], [0.005, 0.000], [0.005, 0.017], [0.010, 0.027], [0.005, 0.027], [0.0025, 0.0195], 
           [0.000, 0.027], [-0.005, 0.027], [0.000, 0.017]];
-
-    //Temporary utility function for converting single origin coords to convertible coords
-      // var tempCoordConversion = function(coordSet){
-      //   var holder = []
-      //   for (coord in coordSet) {
-      //     holder.push([parseFloat(coordSet[coord][0]/1000).toFixed(3), parseFloat(coordSet[coord][1]/668).toFixed(3)]);
-      //   }
-      //   console.log('coords' + holder);
-      // }
   
-  //Movement
-    //Initialize
-      var initialize = function() {
-        startupScreen();
-        startupListener();
-        // tempCoordConversion(loadedDefenseMissileRenderingCoordinates);
-      }
-
-        //Startup screen
-          var startupScreen = function(){
-            canvasCreator();
-            drawFromCoords('#000', backgroundRenderingCoords, 0, 0);
-            $canvas.fillStyle = 'blue';
-            $canvas.font = 'bold ' + canvas_height * 0.06 + 'px arial';
-            $canvas.fillText( 'MISSILE COMMAND: tOP', canvas_width * 0.26, canvas_height * 0.45 );
-            $canvas.fillStyle = 'blue';
-            $canvas.font = 'bold ' + canvas_height * 0.03 + 'px arial';
-            $canvas.fillText( 'CLICK TO FIRE MISSILES AND DEFEND CITIES', canvas_width * 0.275, canvas_height * 0.59 );
-          }
-
-      //Controller for starting the game
-        var levelSetup = function() {
-          canvasCreator();
-          drawBackground();
-          objectCreator(City, cities, cityLocationCoords);
-          objectCreator(DefenseMissileBattery, batteries, defenseMissileBatteryLocationCoords);
-          gameListener();
-          // gameplay flow controller
-          // tempCoordConversion(loadedDefenseMissileRenderingCoordinates);
-        }
-
-        //Raw canvas setup
-          var canvasCreator = function(){
-            $canvasElement.css({ 
-              'display': 'block',
-              'margin': '0 auto',
-              'cursor': 'crosshair'
-            });
-          }
-
-          //Draw level background
-            var drawBackground = function(){
-              //Black background
-                drawFromCoords('#000', backgroundRenderingCoords, 0, 0);
-              //Yellow surface
-                drawFromCoords('#ff0', surfaceRenderingCoords, 0, 0);
-            };
-
-        //Control setup
-          var startupListener = function() {
-            $canvasElement.one( 'click', function( event ) {
-              levelSetup();
-            });
-          }
-
-          var gameListener = function() {
-            $canvasElement.on( 'click', function( event ) {
-              // console.log('width: ' + ( (event.pageX - this.offsetLeft)) );
-              // console.log('height: ' + ( (event.pageY - this.offsetTop)) );
-              selectBattery(event.pageX - this.offsetLeft, event.pageY - this.offsetTop);
-            });
-          }
-
-            var selectBattery = function(x, y) {
-              var sectionWidth = canvas_width/batteries.length;
-              //All batteries have missiles
-                if ( batteries.length === 3 ) {
-                  //Middle of three screen sections
-                  if ( x < sectionWidth * 2 && x > sectionWidth ) {
-                    batteries[1].fire(x, y);
-                  //Left section
-                  } else if ( x < sectionWidth ) {
-                    batteries[0].fire(x, y);
-                  //Right section
-                  } else {
-                    batteries[2].fire(x, y);
-                  }
-              //One battery is spent
-                } else if ( batteries.length === 2 ) {
-                  //Left section
-                  if (x < sectionWidth ) {
-                    batteries[0].fire(x, y);
-                  //Right section
-                  } else {
-                    batteries[1].fire(x, y);
-                  } 
-              //Two batteries spent
-                } else if ( batteries.length === 1 ) {
-                  batteries[0].fire(x, y);
-              //No batteries remain
-                } else { 
-                    //************************** either game over or... **************************
-                }
-              }
-
-
   //Object Declarations
     //Game object prototype
       // function GameObject(x, y) {
@@ -179,7 +86,7 @@ var missileCommand = (function() {
       //   this.y = y;
       //   this.extant = true;
       // }
-    //**************************Come back and set up object inheritance**************************
+    //************************** Come back and set up object inheritance **************************
     //City Object
       function City(x, y) {
         this.x = x;
@@ -197,7 +104,7 @@ var missileCommand = (function() {
         this.draw();
       }
       // City.prototype = Object.create( GameObject.prototype );
-      // // City.prototype.constructor = City;
+      // City.prototype.constructor = City;
       
 
     //Defense missile battery object
@@ -214,17 +121,28 @@ var missileCommand = (function() {
         //Check to make sure battery has missiles; if not, remove from battery array
         this.loaded = function() {
           this.missiles.length > 0 ? true : false;
-          // batteries.splice(batteries.indexOf(this), 1)
         }
         //Remove last missile from missile array
         //**************************be sure to prevent removed missile from rendering**************************
         //**************************start missile firing animation, etc.**************************
-        this.fire = function(x, y){
+        this.fire = function(x, y) {
           if (this.missiles.length > 1) {
-            this.missiles.splice(-1,1);
+            //Remove missile from battery
+            this.missiles.splice(-1, 1);
+            //Fire missile
+            firedMissiles.push(new FiredMissile(this.x, this.y, this.x, this.y, x, y, '#00F')) 
           } else {
-            this.missiles.splice(-1,1);
+            //Remove missile from battery
+            this.missiles.splice(-1, 1);
+            //Fire missile
+            firedMissiles.push(new FiredMissile(this.x, this.y, this.x, this.y, x, y, '#00F'))
+            //Remove battery from batteries array
             batteries.splice(batteries.indexOf(this), 1)
+          }
+        }
+        this.draw = function() {
+          for (missile in this.missiles) {
+            this.missiles[missile].draw();
           }
         }
       };
@@ -247,13 +165,235 @@ var missileCommand = (function() {
         this.draw();
       }
 
+    //Missile in flight object
+      function FiredMissile(originX, originY, currentX, currentY, targetX, targetY, color) {
+        this.originX = originX;
+        this.originY = originY;
+        this.currentX = originX;
+        this.currentY = originY;
+        this.targetX = targetX;
+        this.targetY = targetY;
+        this.color = color;
+        this.blastStatus = 0; 
+        this.renderingCoords = function() {
+          if (originY === 0 ) {
+            return [[ 0.001, 0], [ -0.001, 0], 
+              [ (this.currentX - this.originX)/canvas_width - 0.001 , (this.currentY + this.originY)/canvas_height ], 
+              [ (this.currentX - this.originX)/canvas_width + 0.001 , (this.currentY + this.originY)/canvas_height ]];
+          } else {
+            return [[ 0.001, 0], [ -0.001, 0], 
+              [ (this.currentX - this.originX)/canvas_width - 0.001 , (this.currentY - this.originY)/canvas_height ], 
+              [ (this.currentX - this.originX)/canvas_width + 0.001 , (this.currentY - this.originY)/canvas_height ]];
+          }
+        }
+        this.draw = function() {
+          drawFromCoords(this.color, this.renderingCoords(), this.originX, this.originY);
+        }
+        this.cityHit = function() {
+          for (var i = 0; i < cities.length; i++) {
+            //check both elements of sub-array
+            if ( cities[i].x === targetX && cities[i].y === targetY ) {
+              return i;
+            }
+          }
+        }
+        this.update = function() {
+          //Enemyfire
+            if (originY === 0 && this.currentY + attackingMissileSpeed <= this.targetY) {
+              this.currentY += attackingMissileSpeed; 
+              this.currentX += ( this.targetX - this.originX ) / (( this.targetY + this.originY ) / attackingMissileSpeed);
+              this.draw();
+          //Defensive fire
+            } else if (this.currentY - defendingMissileSpeed >= this.targetY) {
+              this.currentY -= defendingMissileSpeed; 
+              this.currentX -= ( this.targetX - this.originX ) / (( this.targetY - this.originY ) / defendingMissileSpeed);
+              this.draw();
+          //Blowed up
+            } else if (this.blastStatus <= blastRadius) {
+              this.currentY = targetY;
+              this.currentX = targetX;
+              this.draw();
+              //blow up
+              //************************** make it blow up **************************
+              this.blastStatus += blastRadius/fps;
+              $canvas.fillStyle = '#FFF';
+              $canvas.beginPath();
+              $canvas.arc(targetX, targetY, this.blastStatus, 0, 2*Math.PI);
+              $canvas.stroke();
+              $canvas.fill();
+          //Remove from firedMissiles array
+            } else {
+              var target = this.cityHit();
+              if (originY === 0 && target !== undefined) {
+                // console.log(this.cityHit());
+                cities.splice(this.cityHit(), 1); 
+              }
+              firedMissiles.splice(firedMissiles.indexOf(this), 1);
+            }
+        }
+      }
+
+  //Movement
+    //Initialize
+      var initialize = function() {
+        startupScreen();
+        startupListener();
+        // tempCoordConversion(loadedDefenseMissileRenderingCoordinates);
+      }
+
+        //Startup screen
+          var startupScreen = function(){
+            canvasCreator();
+            drawFromCoords('#000', backgroundRenderingCoords, 0, 0);
+            $canvas.fillStyle = 'blue';
+            $canvas.font = 'bold ' + canvas_height * 0.06 + 'px arial';
+            $canvas.fillText( 'MISSILE COMMAND: tOP', canvas_width * 0.26, canvas_height * 0.45 );
+            $canvas.fillStyle = 'blue';
+            $canvas.font = 'bold ' + canvas_height * 0.03 + 'px arial';
+            $canvas.fillText( 'CLICK TO FIRE MISSILES AND DEFEND CITIES', canvas_width * 0.275, canvas_height * 0.59 );
+          }
+
+        //Control setup
+          var startupListener = function() {
+            $canvasElement.one( 'click', function( event ) {
+              levelSetup();
+            });
+          }
+
+    //Controller for starting the game
+      var levelSetup = function() {
+        canvasCreator();
+        drawBackground();
+        objectCreator(City, cities, cityLocationCoords);
+        objectCreator(DefenseMissileBattery, batteries, defenseMissileBatteryLocationCoords);
+        gameListener();
+        // gameplay flow controller
+        startAnimation();
+        // tempCoordConversion(loadedDefenseMissileRenderingCoordinates);
+      }
+
+      //Raw canvas setup
+        var canvasCreator = function(){
+          $canvasElement.css({ 
+            'display': 'block',
+            'margin': '0 auto',
+            'cursor': 'crosshair'
+          });
+        }
+
+        //Draw level background
+          var drawBackground = function(){
+            //Black background
+              drawFromCoords('#000', backgroundRenderingCoords, 0, 0);
+            //Yellow surface
+              drawFromCoords('#ff0', surfaceRenderingCoords, 0, 0);
+          };
+
+        var gameListener = function() {
+          $canvasElement.on( 'click', function( event ) {
+            // console.log('x: ' + ( (event.pageX - this.offsetLeft)) );
+            // console.log('y: ' + ( (event.pageY - this.offsetTop)) );
+            selectBattery(event.pageX - this.offsetLeft, event.pageY - this.offsetTop);
+          });
+        }
+
+          var selectBattery = function(x, y) {
+            //Make sure target is in firing range
+            if ( y < 565) {
+              //Divide screen into thirds
+              var sectionWidth = canvas_width/batteries.length;
+              //Figure out which battery allocation function to use
+              switch (batteries.length) {
+                //All three batteries still have missiles
+                case 3 : 
+                  allBatteriesFire(x, y, sectionWidth);
+                  break;
+                //One spent battery
+                case 2 : 
+                  twoBatteriesFire(x, y, sectionWidth);
+                  break;
+                //One remaining battery
+                case 1 : 
+                  batteries[0].fire(x, y);
+                  break;
+                //no missiles left
+                default:
+                  console.log('gameover');
+              }
+            }
+            //************************** either game over or... **************************
+          }
+
+            var allBatteriesFire = function( x, y, sectionWidth ) {
+              //Middle third
+              if (x < sectionWidth * 2 && x > sectionWidth) {
+                batteries[1].fire(x, y)
+              //Left third
+              } else if (x < sectionWidth) {
+                batteries[0].fire(x, y)
+              //Right third
+              } else {
+                batteries[2].fire(x, y);
+              }
+            }
+
+            var twoBatteriesFire = function( x, y, sectionWidth ) {
+              //Left half
+              if (x < sectionWidth) {
+                batteries[0].fire(x, y)
+              //Right half
+              } else {
+                batteries[1].fire(x, y);
+              }
+            }
+
+      //SetInterval declaration
+        var startAnimation = function() {
+          animation = setInterval( advance, 1000 / fps );
+          attack = setInterval( enemyFire, enemyFireRate );
+        }
+
+          //Frame handler
+            var advance = function() {
+              //Wipe it clean
+              $canvas.clearRect(0,0,canvas_width,canvas_height); 
+              //Re-render background
+              drawBackground();
+              //Update loaded missiles in each battery
+              for (battery in batteries) {
+                batteries[battery].draw();
+              }
+              //Re-render remaining cities
+              for (city in cities) {
+                cities[city].draw();
+              }
+              for (missile in firedMissiles) {
+                firedMissiles[missile].update();
+              }
+              if (cities.length === 0 ){
+                clearInterval(animation);
+                clearInterval(attack);
+                initialize();
+              }
+            }
+
+          var enemyFire = function() {
+            if ( enemyMissilesPending > 0 ) {
+              enemyMissilesPending -= 1;
+              var originX = Math.floor(Math.random() * canvas_width);
+              var target = cities[Math.floor(Math.random() * cities.length)];
+              firedMissiles.push(new FiredMissile(originX, 0, originX, 0, target.x, target.y, '#F00'))
+            }
+          }
+
   //Utility Functions
     //Use coordinate sets to render objects in their respective locations
       var drawFromCoords = function(color, coordSet, originX, originY) {
         $canvas.fillStyle = color;
-        $canvas.beginPath();
         $canvas.moveTo(originX, originY);
+        $canvas.beginPath();
         for (var coord in coordSet) {
+          //Percentage of canvas deviation from origin
           $canvas.lineTo( originX + canvas_width*coordSet[coord][0], originY + canvas_height*coordSet[coord][1] ); 
         }
         $canvas.closePath();
